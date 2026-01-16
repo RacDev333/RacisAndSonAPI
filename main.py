@@ -10,7 +10,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # frontend dev
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,7 +23,6 @@ class EmailSchema(BaseModel):
 
 @app.post("/send-email")
 def send_email_endpoint(email: EmailSchema, background_tasks: BackgroundTasks):
-    # wysyłamy w tle
     background_tasks.add_task(
         send_email, email.address, email.name, email.message
     )
