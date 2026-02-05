@@ -32,7 +32,7 @@ def send_email_to_team(address: str, name: str, message: str):
 
     try:
         params = {
-            "from": "Racis&Son <bot@racis.store>", 
+            "from": "Racis&Son <info@racis.store>", 
             "to": "kontakt@racis.store",
             "subject": f"Nowa wiadomość od: {name}",
             "html": content,

@@ -1,4 +1,5 @@
-from fastapi import FastAPI, BackgroundTasks, Depends
+import os
+from fastapi import FastAPI, BackgroundTasks, Depends, Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from email_utils import order_confirmation_email, send_email
@@ -9,6 +10,11 @@ import crud
 import schemas
 import database
 import models
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 
 load_dotenv()
 
@@ -22,12 +28,15 @@ app = FastAPI(
         "name": "Racis&Son",
         "url": "https://www.racis.store/contact"
     },
-    redirect_slashes=False
+    redirect_slashes=False,
+    docs_url=None if os.getenv("ENV") == "production" else "/docs",
+    redoc_url=None if os.getenv("ENV") == "production" else "/redoc"
 )
 
 origins = [
     "http://localhost:3000",
     "https://racis.store", 
+    "https://www.racis.store",
 ]
 
 app.add_middleware(
@@ -43,8 +52,12 @@ class EmailSchema(BaseModel):
     name: str
     message: str
 
+
+limiter = Limiter(key_func=get_remote_address)
+
 @app.post("/contact/")
-def send_email_endpoint(email: EmailSchema, background_tasks: BackgroundTasks):
+@limiter.limit("3/minute")
+def send_email_endpoint(request: Request, email: EmailSchema, background_tasks: BackgroundTasks):
     background_tasks.add_task(
         send_email, email.address, email.name, email.message
     )
@@ -52,14 +65,15 @@ def send_email_endpoint(email: EmailSchema, background_tasks: BackgroundTasks):
 
 
 # Endpoint do pobierania wszystkich zamówień
-@app.get("/orders/")
-def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
-    orders = crud.get_orders(db, skip=skip, limit=limit)
-    return orders
+# @app.get("/orders/")
+# def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
+#     orders = crud.get_orders(db, skip=skip, limit=limit)
+#     return orders
 
 # Endpoint do tworzenia zamówienia
 @app.post("/orders/")
-def create_order(order: schemas.OrderCreate, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db)):
+@limiter.limit("3/minute")
+def create_order(request: Request, order: schemas.OrderCreate, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db)):
     user_email = order.email
     user_name = order.name
     db_order = crud.create_order(db=db, order=order)
@@ -69,13 +83,15 @@ def create_order(order: schemas.OrderCreate, background_tasks: BackgroundTasks, 
     return {"status": "success", "message": "Order created successfully"}
 
 @app.get("/products/", response_model=List[schemas.Product])
-def get_products(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
+@limiter.limit("100/minute")
+def get_products(request: Request, skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
     products = crud.get_products(db, skip=skip, limit=limit)
     print()
     return products
 
 @app.get("/everything/")
-def get_everything(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
+@limiter.limit("100/minute")
+def get_everything(request: Request, skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db)):
     products = crud.get_products(db, skip=skip, limit=limit)
     codes = crud.get_codes(db, skip=skip, limit=limit)
     broadcasts = crud.get_broadcasts(db, skip=skip, limit=limit)
