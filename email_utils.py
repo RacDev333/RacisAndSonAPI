@@ -2,7 +2,7 @@ import os
 import resend
 from dotenv import load_dotenv
 
-from email_templates import get_contact_confirmation_html
+from email_templates import get_contact_confirmation_html, get_order_confirmation_html
 
 load_dotenv()
 resend.api_key = os.getenv("RESEND_API_KEY")
@@ -50,14 +50,14 @@ def send_email(address: str, name: str, message: str):
 
 
 
-def order_confirmation_email(address: str, name: str, order_num: str):
-
-    content = f"Cześć {name}! \nTwoje zamówienie {order_num} zostało przyjęte i oczekuje na realizację. \n\nDziękujemy za zaufanie, \nZespół Racis&Son"
+def order_confirmation_email(order, products: list):
+    """Wysyła email z potwierdzeniem zamówienia"""
+    content = get_order_confirmation_html(order, products)
 
     try:
         params = {
             "from": "Racis&Son <kontakt@racis.store>", 
-            "to": [address],
+            "to": [order.email],
             "subject": "Zamówienie przyjęte!",
             "html": content,
         }

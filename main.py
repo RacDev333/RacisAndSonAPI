@@ -74,12 +74,9 @@ def send_email_endpoint(request: Request, email: EmailSchema, background_tasks: 
 @app.post("/orders/")
 @limiter.limit("3/minute")
 def create_order(request: Request, order: schemas.OrderCreate, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db)):
-    user_email = order.email
-    user_name = order.name
     db_order = crud.create_order(db=db, order=order)
-    order_num = db_order.order_number
-    #wysylanie maila z potwierdzeniem
-    #background_tasks.add_task(order_confirmation_email, user_email, user_name, order_num)
+    # Wysyłanie maila z potwierdzeniem w tle
+    background_tasks.add_task(order_confirmation_email, db_order, db_order.products)
     return {"status": "success", "message": "Order created successfully"}
 
 @app.get("/products/", response_model=List[schemas.Product])
